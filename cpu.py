@@ -13,6 +13,7 @@ CALL = 0b01010000
 RET = 0b00010001
 ADD = 0b10100000
 CMP = 0b10100111 # Compare the values in two registers.
+JMP = 0b01010100 # Jump to the address stored in the given register.
 SP = 7 
 
 #flags for cmp
@@ -39,6 +40,7 @@ class CPU:
         self.branchtable[RET] = self.handle_RET
         self.branchtable[ADD] = self.handle_ADD
         self.branchtable[CMP] = self.handle_CMP
+        self.branchtable[JMP] = self.handle_JMP
         
 
     def ram_read(self, mar): 
@@ -184,7 +186,12 @@ class CPU:
         # Pop the value from the top of the stack and store it in the PC.
         self.pc = self.ram[self.reg[SP]]
         self.reg[SP] += 1
-        
+
+    def handle_JMP(self):
+        # Jump to the address stored in the given register.
+        address = self.ram_read(self.pc + 1)
+        # Set the PC to the address stored in the given register.
+        self.pc = self.reg[address]
 
     def run(self):
         """Run the CPU."""
