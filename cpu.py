@@ -14,12 +14,10 @@ RET = 0b00010001
 ADD = 0b10100000
 CMP = 0b10100111 # Compare the values in two registers.
 JMP = 0b01010100 # Jump to the address stored in the given register.
+JEQ = 0b01010101 # If equal flag is set (true), jump to the address stored in the given register.
+JNE = 0b01010110 #If E flag is clear (false, 0), jump to the address stored in the given register.
 SP = 7 
 
-#flags for cmp
-E = 0
-L = 0
-G = 0
 
 class CPU:
     """Main CPU class."""
@@ -29,6 +27,7 @@ class CPU:
         self.reg = [0] * 8 #general purpose register (has 8 bits)
         self.ram = [0] * 256 #to hold 256 bytes of memory
         self.pc = 0 #program counter
+        self.fl = False #equal flag
         self.branchtable = {}
         self.branchtable[LDI] = self.handle_LDI
         self.branchtable[PRN] = self.handle_PRN
@@ -41,7 +40,8 @@ class CPU:
         self.branchtable[ADD] = self.handle_ADD
         self.branchtable[CMP] = self.handle_CMP
         self.branchtable[JMP] = self.handle_JMP
-        
+        self.branchtable[JEQ] = self.handle_JEQ
+        self.branchtable[JNE] = self.handle_JNE
 
     def ram_read(self, mar): 
         #should accept the address to read and 
@@ -83,13 +83,28 @@ class CPU:
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "MUL": # Multiply the values in two registers together and store the result in registerA
             self.reg[reg_a] *= self.reg[reg_b]
-        elif op == "CMP":
+
+        elif op == "CMP": # Compare the values in two registers.
             if self.reg[reg_a] == self.reg[reg_b]:
-                E = 1
-            elif self.reg[reg_a] < self.reg[reg_b]:
-                L = 1
-            elif self.reg[reg_a] > self.reg[reg_b]:
-                G = 1
+                self.fl = True
+
+        elif op == "JMP": # Jump to the address stored in the given register.
+            self.pc = self.reg[reg_a]
+        
+        elif op == "JEQ": # If equal flag is set (true), jump to the address stored in the given register.
+            if self.fl is True:
+                self.pc = self.reg[reg_a]
+            else:
+                self.pc += 2
+
+        elif op == "JNE": # If E flag is clear (false, 0), jump to the address stored in the given register.
+            if self.fl is False:
+                self.pc = self.reg[reg_a]
+            else:
+                self.pc += 2
+
+
+
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -147,6 +162,7 @@ class CPU:
         self.alu("CMP", operand_a, operand_b)
         self.pc += 3
 
+
     def handle_HLT(self):
         sys.exit(0) #exit without an error unlike sys.exit 1 which means an error
 
@@ -188,10 +204,26 @@ class CPU:
         self.reg[SP] += 1
 
     def handle_JMP(self):
-        # Jump to the address stored in the given register.
-        address = self.ram_read(self.pc + 1)
+        # Jump to the address stored in the given register
         # Set the PC to the address stored in the given register.
-        self.pc = self.reg[address]
+
+        operand_a = self.ram_read(self.pc + 1) 
+        self.alu("JMP", operand_a, None) #None b/c we don't need operand_b
+
+
+    def handle_JEQ(self):
+        # If equal flag is set (true), jump to the address stored in the given register.
+        operand_a = self.ram_read(self.pc + 1) 
+
+        self.alu("JEQ", operand_a, None) #None b/c we don't need operand_b
+
+
+    def handle_JNE(self):
+        # If E flag is clear (false, 0), jump to the address stored in the given register.
+        operand_a = self.ram_read(self.pc + 1) 
+
+        self.alu("JNE", operand_a, None) #None b/c we don't need operand_b
+
 
     def run(self):
         """Run the CPU."""
@@ -201,48 +233,3 @@ class CPU:
         while running: 
             IR = self.ram[self.pc] #fetch value from RAM and then use that value to look up handler function in the branch table
             self.branchtable[IR]()
-
-
-
-
-
-
-
-
-
-
-
-
-# Add list properties to the CPU class to hold 256 bytes of memory and general-purpose registers
-    #Also add properties for any internal registers
-
-#In CPU, add method ram_read() and ram_write() that access the RAM inside the CPU object
-    #ram_read() should accept the address to read and return the value stored there
-    #ram_write() should accept a value to write, and address to write it to
-
-#Implement the core of the CPU's run() method
-    # needs to read to memory address that's stored in register PC -> store that result in IR, the Instruction Register. This can just be a local variable in run()
-    # some instructions requires up to the next bytes of data after the PC in memory
-    # using ram_read(), read the bytes at pc + 1 and pc + 2 from RAM into variables operand_a and operand_b in case the instruction needs them
-    # Depending on the value of the opcode, perform the actions needed for the instruction per the LS-8 spec. (if-elif)
-    # the PC needs to be updated to point to the next instruction for the next iteration of the loop in run()
-
-#Implement the HLT instruction handler to cpu.py
-    # So that you can refer to it by name instead of by numeric value
-    # in run() in your switch, exit the loop if a HLT instruction is encountered, regardless of whether or not there are more lines of code in the LS-8 program 
-    # consider HLT similar to exit()
-    # halt the CPU and exits the emulator
-
-# Add the LDI instruction handler
-    # This instruction sets a specified register to a specified value
-    # load "immediate", store a value in a register, or "set this register to this value"
-
-# Add the PRN instruction handler
-    # Similar to adding LDI, but the handler is simpler
-    # At this point, you can run the program and have it print 8 to console.
-    # a pseudo-instruction that prints the numeric value stored in a register
-
-#PUSH and POP (the stack)
-    # so the stack is in memory (self.ram). It starts at self.ram[F3] as per the spec, and the stack pointer points to the value at the top of the stack. Since the stack is "growing down" in memory, the stack pointer is decremented every time something is added to the top. 
-    # so if the stack is empty and we push two values, the stack pointer becomes F2 (pointing to the top value).
-    # we initialize our stack pointer to F4 instead of F3 because at the beginning there’s nothing in it
