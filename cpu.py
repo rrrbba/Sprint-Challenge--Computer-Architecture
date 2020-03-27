@@ -12,7 +12,13 @@ PUSH = 0b01000101 # Push the value in the given register on the stack.
 CALL = 0b01010000
 RET = 0b00010001
 ADD = 0b10100000
+CMP = 0b10100111 # Compare the values in two registers.
 SP = 7 
+
+#flags for cmp
+E = 0
+L = 0
+G = 0
 
 class CPU:
     """Main CPU class."""
@@ -32,6 +38,7 @@ class CPU:
         self.branchtable[CALL] = self.handle_CALL
         self.branchtable[RET] = self.handle_RET
         self.branchtable[ADD] = self.handle_ADD
+        self.branchtable[CMP] = self.handle_CMP
         
 
     def ram_read(self, mar): 
@@ -74,6 +81,13 @@ class CPU:
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "MUL": # Multiply the values in two registers together and store the result in registerA
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] == self.reg[reg_b]:
+                E = 1
+            elif self.reg[reg_a] < self.reg[reg_b]:
+                L = 1
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                G = 1
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -122,6 +136,13 @@ class CPU:
         operand_b = self.ram_read(self.pc + 2)
 
         self.alu("ADD", operand_a, operand_b)
+        self.pc += 3
+
+    def handle_CMP(self):
+        operand_a = self.ram_read(self.pc + 1) 
+        operand_b = self.ram_read(self.pc + 2)
+
+        self.alu("CMP", operand_a, operand_b)
         self.pc += 3
 
     def handle_HLT(self):
